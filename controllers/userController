@@ -1,0 +1,143 @@
+const users = [
+  { id: 1, name: 'Ali', email: 'ali@example.com', age: 22 },
+  { id: 2, name: 'Sara', email: 'sara@example.com', age: 25 },
+];
+let nextId = 3;
+
+// Validates the request body and returns an error message, or null if valid
+function validateUser(body) {
+  const { name, email, age } = body;
+
+  if (typeof name !== 'string' || name.trim().length < 2) {
+    return 'Name is required (at least 2 characters)';
+  }
+  if (
+    typeof email !== 'string' ||
+    !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())
+  ) {
+    return 'A valid email is required';
+  }
+  if (!Number.isInteger(age) || age < 1 || age > 120) {
+    return 'Age must be a whole number between 1 and 120';
+  }
+  return null;
+}
+
+// Converts the :id route parameter to a number, or returns null if invalid
+function parseId(req) {
+  const id = Number(req.params.id);
+  return Number.isInteger(id) ? id : null;
+}
+
+// GET /api/users
+exports.getAllUsers = (req, res) => {
+  res.status(200).json({
+    success: true,
+    count: users.length,
+    data: users,
+  });
+};
+
+// GET /api/users/:id
+exports.getUserById = (req, res) => {
+  const id = parseId(req);
+  if (id === null) {
+    return res.status(400).json({ success: false, message: 'Invalid user id' });
+  }
+
+  const user = users.find((u) => u.id === id);
+  if (!user) {
+    return res.status(404).json({ success: false, message: 'User not found' });
+  }
+
+  res.status(200).json({ success: true, data: user });
+};
+
+// POST /api/users
+exports.createUser = (req, res) => {
+  const body = req.body || {};
+
+  const error = validateUser(body);
+  if (error) {
+    return res.status(400).json({ success: false, message: error });
+  }
+
+  const email = body.email.trim().toLowerCase();
+  if (users.some((u) => u.email === email)) {
+    return res
+      .status(409)
+      .json({ success: false, message: 'Email already exists' });
+  }
+
+  const newUser = {
+    id: nextId++,
+    name: body.name.trim(),
+    email,
+    age: body.age,
+  };
+  users.push(newUser);
+
+  res.status(201).json({
+    success: true,
+    message: 'User created successfully',
+    data: newUser,
+  });
+};
+
+// PUT /api/users/:id
+exports.updateUser = (req, res) => {
+  const id = parseId(req);
+  if (id === null) {
+    return res.status(400).json({ success: false, message: 'Invalid user id' });
+  }
+
+  const user = users.find((u) => u.id === id);
+  if (!user) {
+    return res.status(404).json({ success: false, message: 'User not found' });
+  }
+
+  const body = req.body || {};
+  const error = validateUser(body);
+  if (error) {
+    return res.status(400).json({ success: false, message: error });
+  }
+
+  // Email must stay unique across all other users
+  const email = body.email.trim().toLowerCase();
+  if (users.some((u) => u.email === email && u.id !== id)) {
+    return res
+      .status(409)
+      .json({ success: false, message: 'Email already exists' });
+  }
+
+  user.name = body.name.trim();
+  user.email = email;
+  user.age = body.age;
+
+  res.status(200).json({
+    success: true,
+    message: 'User updated successfully',
+    data: user,
+  });
+};
+
+// DELETE /api/users/:id
+exports.deleteUser = (req, res) => {
+  const id = parseId(req);
+  if (id === null) {
+    return res.status(400).json({ success: false, message: 'Invalid user id' });
+  }
+
+  const index = users.findIndex((u) => u.id === id);
+  if (index === -1) {
+    return res.status(404).json({ success: false, message: 'User not found' });
+  }
+
+  const [deleted] = users.splice(index, 1);
+
+  res.status(200).json({
+    success: true,
+    message: 'User deleted successfully',
+    data: deleted,
+  });
+};
